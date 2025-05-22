@@ -176,7 +176,7 @@ TOP 10: event_action — два пиковых действия + множест
 TOP 10: event_category — один лидер и постепенное снижение;
 ![TOP_event_category.png](TOP_event_category.png)
 
-boxplot event_action, event_category — подтверждают небольшую дисперсию у популярных значений.
+Boxplot event_action и event_category подтверждают небольшую дисперсию у популярных значений.
 ![Event_category&action.png](Event_category&action.png)
 
 **4. Источники и каналы трафика**
@@ -195,12 +195,11 @@ TOP 10: utm_source, utm_medium, utm_campaign, utm_adcontent — выраженн
 **5. Технические признаки сессии и активности**
 
 - Признаки visit_number, hit_number, hit_time сильно скошены вправо;
-- Много выбросов, но это может быть связано с реальным поведением "лояльных" пользователей;
-- Требуется нормализация или логарифмирование.
+- Много выбросов, но это может быть связано с реальным поведением "лояльных" пользователей.
 
 Графики:
 
-boxplot: visit_number, hit_number, hit_time — наглядно демонстрируют выбросы и скошенность;
+Boxplot visit_number, hit_number и hit_time наглядно демонстрируют выбросы и скошенность.
 ![Vizitt_number.png](Vizitt_number.png)
 ![Hit_number.png](Hit_number.png)
 ![Hit_time.png](Hit_time.png)

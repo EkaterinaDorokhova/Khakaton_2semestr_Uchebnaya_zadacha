@@ -226,6 +226,8 @@ Boxplot visit_number, hit_number и hit_time наглядно демонстри
 - Сравнение ROC-AUC на валидации;
 - Выбор наиболее эффективной и использование для финальной модели в web-приложении.
 
+Работающий фрагмент решения (код) можно найти по ссылке: [Uchebnaya_zadacha_komanda_4.ipynb](Uchebnaya_zadacha_komanda_4.ipynb)
+
 ---
 
 **Сценарий 1: CatBoost (градиентный бустинг)**

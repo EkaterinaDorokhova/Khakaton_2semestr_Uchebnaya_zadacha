@@ -188,7 +188,8 @@ boxplot event_action, event_category — подтверждают небольш
 График:
 
 TOP 10: utm_source, utm_medium, utm_campaign, utm_adcontent — выраженные пики и длинные "хвосты".
-![Топ источников и ресурсов](Top_istochniko_i_resursov.png)
+![Топ источников и ресурсов_1](TOP_utm1.png)
+![Топ источников и ресурсов_2](TOP_utm2.png)
 
 
 **5. Технические признаки сессии и активности**

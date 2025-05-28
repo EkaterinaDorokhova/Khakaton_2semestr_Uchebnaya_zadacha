@@ -14,7 +14,7 @@
 
 ---
 
-## Описание данных
+## Данные
 
 **Проект основан на двух источниках:**
 
@@ -207,7 +207,7 @@ Boxplot visit_number, hit_number и hit_time наглядно демонстри
 
 ---
 
-### Этапы 3-4. Проектирование и выбор модели. Реализация предсказательной модели
+### Этапы 3-4. Выбор, проектирование и реализация предсказательной модели
 
 Этапы 3-4 включают
 - Выбор и реализацию модели. В рамках проекта мы строим модель с использованием бустинга, т.к. CatBoost показывает наилучшее качество без сложной обработки признаков;
@@ -220,26 +220,125 @@ Boxplot visit_number, hit_number и hit_time наглядно демонстри
 
 ---
 
-**Алгоритм - CatBoost (градиентный бустинг)**
+### Алгоритм - CatBoost (градиентный бустинг)
 
-Мы выбрали CatBoost как основной алгоритм бустинга по следующим причинам:
-- Поддержка категориальных признаков "из коробки" - категориальные признаки передаются напрямую как есть; 
+В рамках проекта выбрана модель "CatBoostClassifier", поскольку она эффективно работает с категориальными признаками без необходимости ручного кодирования и демонстрирует высокое качество на задачах с дисбалансом классов.
+
+**1. Поддержка категориальных признаков "из коробки" - категориальные признаки передаются напрямую как есть**
   Используется CatBoost с автоматической обработкой - модель обрабатывает категориальные переменные без необходимости ручного кодирования (one-hot, target encoding и т.д.), что позволяет избежать разрастания размерности и ошибок в обработке признаков.
-- Устойчивость к переобучению и к дисбалансу классов
+
+**2. Устойчивость к переобучению и к дисбалансу классов**
   CatBoost автоматически регулирует регуляризацию и может справляться с задачами, где один класс преобладает (что характерно для нашего target).
-- Высокое качество на малых и средних выборках
+
+**3. Высокое качество на малых и средних выборках**
   Учитывая ограниченный объём сессий (~десятки тысяч), CatBoost обеспечивает стабильную производительность даже без гиперпараметрического тюнинга.
-- Интерпретируемость
+
+**4. Интерпретируемость**
   Модель позволяет анализировать важность признаков, что даёт полезную бизнес-информацию.
 
-Пример использования:
+**Обучение модели CatBoost**
+
+
+Установка и импорты
+
+```python
+!pip install catboost
+```
+
 ```python
 from catboost import CatBoostClassifier
-
-cat_features = ['utm_source', 'utm_medium', 'device_category', 'device_os', 'geo_city']
-model = CatBoostClassifier(cat_features=cat_features, random_seed=42)
-model.fit(X_train, y_train)
+from sklearn.model_selection import train_test_split, RandomizedSearchCV
+from sklearn.metrics import roc_auc_score
 ```
+
+
+Формирование целевого признака
+
+```python
+target_actions = [
+    "form_request_call_sent", "callback_requested", "sub_submit_success",
+    "sub_callback_submit_click", "click_on_request_call", "click_free_car_selection",
+    "click_buy_auto", "user_gave_contacts_during_chat", "chat_requested",
+    "client_initiate_chat", "success_card_action", "success_id_creation",
+    "sub_car_request_submit_click", "sub_custom_question_submit_click"
+]
+
+df_merge["target"] = df_merge["event_action"].isin(target_actions).astype(int)
+```
+
+Создаётся бинарный признак: `1`, если пользователь совершил целевое действие (например, заказал звонок или оставил заявку), и `0` — в противном случае.
+
+
+Подготовка признаков
+
+```python
+features = [
+    "visit_number", "utm_source", "utm_medium", "utm_campaign", "utm_adcontent",
+    "utm_keyword", "device_category", "device_os", "device_brand",
+    "device_screen_resolution", "device_browser", "geo_country",
+    "geo_city", "hit_time", "hit_number"
+]
+
+df_model = df_merge[features + ['target']].dropna()
+X = df_model[features]
+y = df_model['target']
+```
+
+
+Обработка категориальных признаков
+
+```python
+cat_features = X.select_dtypes(include=['object', 'category']).columns.tolist()
+
+for col in cat_features:
+    X[col] = X[col].astype(str)
+```
+
+
+Разделение на обучающую и тестовую выборки
+
+```python
+X_train, X_test, y_train, y_test = train_test_split(X, y, stratify=y, random_state=42)
+```
+
+
+Обучение модели CatBoost
+
+```python
+best_params = {
+    'scale_pos_weight': 3,
+    'random_strength': 1,
+    'learning_rate': 0.1,
+    'l2_leaf_reg': 1,
+    'iterations': 300,
+    'depth': 4,
+    'border_count': 128,
+    'bagging_temperature': 0.1
+}
+
+model = CatBoostClassifier(
+    **best_params,
+    cat_features=cat_features,
+    eval_metric="AUC",
+    verbose=100,
+    random_state=42
+)
+
+model.fit(X_train, y_train, eval_set=(X_test, y_test), use_best_model=True)
+
+y_pred_proba = model.predict_proba(X_test)[:, 1]
+print(f"ROC-AUC: {roc_auc_score(y_test, y_pred_proba):.4f}")
+```
+
+
+Сохранение модели
+
+```python
+import pickle
+with open("model.pkl", "wb") as f:
+    pickle.dump(model, f)
+```
+
 
 ---
 

@@ -313,8 +313,8 @@ pipeline.fit(X_train, y_train)
 **Данные для прогноза**
    - Интерфейс формируется с помощью компонентов Streamlit:
      - `st.selectbox()` — для категориальных признаков (например, `utm_source`, `device_os`)
-     - `st.number_input()` — для числовых признаков (`visit_number`, `hit_number`)
      - `st.text_input()` — для текстовых или закодированных значений
+     - `st.text_input()` с проверкой на ввод только числовых значений — для числовых признаков (`visit_number`, `hit_number`)
    - Пример:
      ```python
      utm_source = st.selectbox(\"Источник трафика\", [\"google\", \"direct\", \"yandex\", \"other\"])
@@ -322,14 +322,14 @@ pipeline.fit(X_train, y_train)
      ```
 
 **Вводимые параметры:**
-1. Номер визита
+1. Номер визита клиента
 2. Источник и тип трафика
-3. Кампания и объявлени
+3. Кампания и объявление
 4. Ключевое слово
 5. Тип устройства, ОС, бренд
 6. Разрешение и браузер
 7. Страна и город
-8. Время и номер хита
+8. Время и номер происхождения события
 
 ### Интерфейс:
 ![Интерфейс приложения](webapp_form.png)
@@ -356,64 +356,111 @@ streamlit run app.py
 
 import streamlit as st
 import pandas as pd
-import pickle
+import joblib
+import datetime
+from transform import transform_input
 
-# Загрузка модели
-with open("model.pkl", "rb") as f:
-    model = pickle.load(f)
+model = joblib.load("model.pkl")
 
-st.set_page_config(page_title="Прогноз конверсии", layout="centered")
-st.title("Прогнозирование конверсии по 15 признакам")
+st.title("Предсказание вероятности конверсии")
 
-# Форма ввода признаков
-visit_number = st.number_input("Номер визита", min_value=1, max_value=1000, value=100)
-utm_source = st.selectbox("Источник трафика (utm_source)", ["direct", "google", "yandex", "other"])
-utm_medium = st.selectbox("Тип трафика (utm_medium)", ["cpc", "banner", "referral", "other"])
-utm_campaign = st.text_input("Кампания (utm_campaign)", "autumn2024")
-utm_adcontent = st.text_input("Объявление (utm_adcontent)", "ad3")
-utm_keyword = st.text_input("Ключевое слово (utm_keyword)", "buy now")
-device_category = st.selectbox("Тип устройства", ["mobile", "desktop", "tablet"])
-device_os = st.selectbox("ОС устройства", ["Android", "iOS", "Windows"])
-device_brand = st.selectbox("Бренд устройства", ["Apple", "Samsung", "Xiaomi", "Huawei", "other"])
-device_screen = st.text_input("Разрешение экрана", "1920x1080")
-device_browser = st.selectbox("Браузер", ["Chrome", "Safari", "Firefox", "other"])
-geo_country = st.selectbox("Страна", ["Russia", "Ukraine", "other"])
-geo_city = st.text_input("Город", "Moscow")
-hit_time = st.text_input("Время хита (hh:mm:ss)", "00:00:01")
-hit_number = st.number_input("Номер хита", min_value=1, max_value=1000, value=1)
+# Ввод номера визита как текст с проверкой
+visit_number_input = st.text_input("Порядковый номер визита клиента", value="1", placeholder="Введите число от 1 до 1000")
 
-# Обработка и предсказание
-if st.button("Предсказать"):
-    # Формируем DataFrame
-    df = pd.DataFrame([{
-        "visit_number": visit_number,
-        "utm_source": utm_source,
-        "utm_medium": utm_medium,
-        "utm_campaign": utm_campaign,
-        "utm_adcontent": utm_adcontent,
-        "utm_keyword": utm_keyword,
-        "device_category": device_category,
-        "device_os": device_os,
-        "device_brand": device_brand,
-        "device_screen": device_screen,
-        "device_browser": device_browser,
-        "geo_country": geo_country,
-        "geo_city": geo_city,
-        "hit_time": hit_time,
-        "hit_number": hit_number
-    }])
+# Проверка корректности и преобразование
+try:
+    visit_number = int(visit_number_input)
+    if not (1 <= visit_number <= 1000):
+        st.error("Введите число от 1 до 1000.")
+        visit_number = None
+except ValueError:
+    st.error("Введите целое число.")
+    visit_number = None
 
-    # Предсказание
-    prob = model.predict_proba(df)[0, 1] * 100
-    st.success(f"Вероятность конверсии: {prob:.2f}%")
+utm_source = st.text_input("Канал привлечения (utm_source)", value="unknown", placeholder="Введите название источника трафика")
+utm_medium = st.selectbox("Тип привлечения (utm_medium)", ["(none)", "app", "article", "banner", "blogger_channel", "blogger_header", "blogger_stories", "cbaafe", "catalogue", "clicks", "cpa", "cpc", "cpv", "cpm", "dom_click", "email", "fb_smm", "google_cpc", "info_text", "landing", "landing_interests", "last", "link", "linktest", "main_polka", "medium", "nkp", "ok_smm", "organic", "outlook", "partner", "post", "promo_sber", "push", "qrcodevideo", "qr", "reach", "referral", "sber_app", "smm", "smartbanner", "sms", "social", "static", "stories", "tablet", "tg", "users_msk", "vk_smm", "yandex_cpc", "Other"])
+utm_campaign = st.text_input("Рекламная кампания (utm_campaign)", value="unknown", placeholder="Введите название кампании")
+utm_adcontent = st.text_input("Объявление (utm_adcontent)", value="unknown", placeholder="Введите содержание")
+utm_keyword = st.text_input("Ключевое слово (utm_keyword)", value="unknown", placeholder="Введите ключевое слово")
+
+device_category = st.selectbox("Тип устройства", ['mobile', 'tablet', 'desktop'])
+device_os = st.selectbox("ОС устройства", ["unknown", "Android", "BlackBerry", "Chrome OS", "Firefox OS", "iOS", "Linux", "MacOS", "Nokia", "Samsung", "Tizen", "Windows", "Windows Phone", "Other"])
+device_brand = st.selectbox("Бренд устройства", ["unknown", "Apple", "Asus", "Google", "Huawei", "LG", "Lenovo", "Nokia", "OnePlus", "OPPO", "Realme", "Samsung", "Sony", "Vivo", "Xiaomi", "Other"])
+device_screen_resolution = st.selectbox("Разрешение экрана", ["unknown", "320x568", "360x640", "375x667", "375x812", "390x844", "412x915", "414x896", "430x932", "768x1024", "800x1280", "820x1180", "1024x1366", "1280x720", "1280x800", "1360x768", "1366x768", "1440x900", "1536x864", "1600x900", "1620x1080", "1680x1050", "1920x1080", "1920x1200", "2048x1080", "2160x1440", "2256x1504", "2304x1440", "2560x1440", "2736x1824", "2880x1800", "3000x2000", "3840x2160", "other"])
+device_browser = st.selectbox("Браузер", ["(none)", "Android Webview", "Chrome", "Edge", "Firefox", "Internet Explorer", "Opera", "Opera Mini", "Safari", "UC Browser","YaBrowser", "Other"])
+
+geo_country = st.selectbox("Страна", ["(none)", "Russia", "Belarus", "Kazakhstan", "Uzbekistan", "Armenia", "Azerbaijan", "Georgia", "Kyrgyzstan", "Tajikistan", "United States", "Germany", "United Kingdom", "France", "Italy", "India", "Turkey", "Netherlands", "China", "Other"])
+geo_city = st.text_input("Город", value="unknown")
+
+hit_time_str = st.text_input("Время события (в формате hh:mm:ss)", value="00:07:58", placeholder="например, 00:08:30")
+hit_number = st.text_input("Порядковый номер события", value="3")
+
+# Проверка корректности времени
+try: 
+    datetime.datetime.strptime(hit_time_str, "%H:%M:%S")
+    hit_time = hit_time_str
+except ValueError:
+    st.error("Введите время в формате hh:mm:ss (например, 08:30:00)")
+    hit_time = None
+
+# Проверка корректности номера хита
+try:
+    hit_number = int(hit_number)
+except ValueError:
+    st.error("Пожалуйста, введите целое число для номера события.")
+    hit_number = None
+
+# Запуск прогноза, только если оба значения валидны
+if st.button("Предсказать") and hit_time and hit_number is not None and visit_number is not None:
+    df = transform_input(
+        visit_number, utm_source, utm_medium, utm_campaign, utm_adcontent, utm_keyword,
+        device_category, device_os, device_brand, device_screen_resolution, device_browser,
+        geo_country, geo_city, hit_time, hit_number
+    )
+    prob = model.predict_proba(df)[0][1]
+    st.success(f"Вероятность конверсии: {prob:.2%}")
 
 ```
 ### Предсказание вероятности**
    - Модель возвращает вероятность конверсии:
      ```python
-     prob = model.predict_proba(df)[0, 1]
-     st.success(f\"Вероятность конверсии: {prob:.2%}\")
+       prob = model.predict_proba(df)[0][1]
+       st.success(f"Вероятность конверсии: {prob:.2%}")
      ```
+---
+
+**Вспомогательный файл для подготовки входных данных для модели машинного обучения**
+```python
+import pandas as pd
+
+def time_to_seconds(t):
+    h, m, s = map(int, t.split(":"))
+    return h * 3600 + m * 60 + s
+
+def transform_input(
+    visit_number, utm_source, utm_medium, utm_campaign, utm_adcontent, utm_keyword,
+    device_category, device_os, device_brand, device_screen_resolution, device_browser,
+    geo_country, geo_city, hit_time, hit_number
+):
+    data = {
+        'visit_number': [visit_number],
+        'utm_source': [utm_source],
+        'utm_medium': [utm_medium],
+        'utm_campaign': [utm_campaign],
+        'utm_adcontent': [utm_adcontent],
+        'utm_keyword': [utm_keyword],
+        'device_category': [device_category],
+        'device_os': [device_os],
+        'device_brand': [device_brand],
+        'device_screen_resolution': [device_screen_resolution],
+        'device_browser': [device_browser],
+        'geo_country': [geo_country],
+        'geo_city': [geo_city],
+        'hit_time': [time_to_seconds(hit_time)],
+        'hit_number': [hit_number]
+    }
+    df = pd.DataFrame(data)
+    return df
 ---
 
 ## Структура проекта

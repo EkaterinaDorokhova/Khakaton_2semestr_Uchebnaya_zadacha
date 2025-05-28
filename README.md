@@ -379,6 +379,7 @@ catboost
 
 
 **2. Первичный запуск приложения**
+
 ***1.1. Обновление системы***
 ```bash
 streamlit run app.py
@@ -489,6 +490,7 @@ def transform_input(
 ```
 
 **3. Запуск в фоне**
+
 ***3.1. Установка tmux***
 ```bash
 sudo apt install tmux
